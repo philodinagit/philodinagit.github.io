@@ -1,23 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>Leaflet on GitHub Pages</title>
+    <meta charset="UTF-8">
+    <title>日本アルプス・マップ</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* 地図を表示するエリアの高さを指定 */
-        #map { height: 600px; width: 100%; }
+        #map { height: 100vh; width: 100%; } /* 画面いっぱいに表示 */
+        body { margin: 0; }
     </style>
 </head>
 <body>
     <div id="map"></div>
+
     <script>
-        // 地図を初期化（広島付近を表示）
-        var map = L.map('map').setView([34.3976, 132.4594], 13);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // 1. 地図の初期化
+        var map = L.map('map').setView([35.7, 137.8], 8);
+
+        // 背景地図（OpenStreetMap）
+        var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
-        L.marker([34.3976, 132.4594]).addTo(map).bindPopup('広島！').openPopup();
+
+        // 2. ポイント群（グループ）の作成
+        
+        // 北アルプス
+        var northAlps = L.layerGroup([
+            L.marker([36.391, 137.648]).bindPopup('槍ヶ岳'),
+            L.marker([36.289, 137.648]).bindPopup('穂高岳'),
+            L.marker([36.759, 137.620]).bindPopup('剱岳')
+        ]);
+
+        // 中央アルプス
+        var centralAlps = L.layerGroup([
+            L.marker([35.789, 137.806]).bindPopup('木曽駒ヶ岳'),
+            L.marker([35.728, 137.805]).bindPopup('空木岳')
+        ]);
+
+        // 南アルプス
+        var southAlps = L.layerGroup([
+            L.marker([35.674, 138.238]).bindPopup('北岳'),
+            L.marker([35.538, 138.176]).bindPopup('赤石岳'),
+            L.marker([35.589, 138.223]).bindPopup('間ノ岳')
+        ]);
+
+        // 最初からすべて表示しておく
+        northAlps.addTo(map);
+        centralAlps.addTo(map);
+        southAlps.addTo(map);
+
+        // 3. チェックボックス（コントロール）の設定
+        var baseMaps = {
+            "標準地図": osm
+        };
+
+        var overlayMaps = {
+            "北アルプス": northAlps,
+            "中央アルプス": centralAlps,
+            "南アルプス": southAlps
+        };
+
+        // 地図の右上にコントロールを追加
+        L.control.layers(baseMaps, overlayMaps, {collapsed: false}).addTo(map);
     </script>
 </body>
 </html>
