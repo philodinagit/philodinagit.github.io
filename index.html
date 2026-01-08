@@ -4,115 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日本アルプス登山マップ</title>
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
     <style>
-        /* 全画面表示の設定 */
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-
-        /* 更新日表示ラベルのスタイル */
         #last-update {
-            position: absolute;
-            bottom: 30px;
-            left: 10px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 5px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-family: sans-serif;
-            border: 1px solid #999;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: absolute; bottom: 30px; left: 10px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9); padding: 5px 12px;
+            border-radius: 4px; font-size: 12px; font-family: sans-serif;
+            border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             pointer-events: none;
         }
-
-        /* カスタムピン（ドット）のスタイル */
         .my-custom-pin {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+            width: 14px; height: 14px; border-radius: 50%;
+            border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
-
-    <div id="last-update">データを読み込み中...</div>
+    <div id="last-update">更新日を確認中...</div>
     <div id="map"></div>
 
     <script>
-        // 1. 地図の初期化（地理院地図：標準）
+        // --- 地図の初期化 ---
         var map = L.map('map').setView([35.7, 137.8], 8);
         L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
             attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>"
         }).addTo(map);
 
-        // 2. 年ごとの色設定（CSVのdate_groupに合わせる）
-        var yearColors = {
-            "2023年": "#FF5733", // 赤橙
-            "2024年": "#33AA57", // 緑
-            "2025年": "#3357FF", // 青
-            "default": "#999999"  // 予備の色
-        };
+        // --- 1. 外部テキスト(update.txt)から更新日を読み込む ---
+        fetch('update.txt')
+            .then(response => response.text())
+            .then(text => {
+                document.getElementById('last-update').innerText = "最終データ更新: " + text;
+            })
+            .catch(err => {
+                document.getElementById('last-update').innerText = "更新日の取得に失敗しました";
+            });
 
+        // --- 2. CSV読み込みと表示（前回と同じ） ---
+        var yearColors = {
+            "2023年": "#FF5733", "2024年": "#33AA57", "2025年": "#3357FF", "default": "#999999"
+        };
         var dateLayers = {};
 
-        // 3. CSVの読み込みとマーカー配置
         Papa.parse("mountains.csv", {
             download: true,
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                console.log("CSV読み込み完了:", results.data);
-
                 results.data.forEach(function(row) {
-                    // 必須項目がない行は飛ばす
                     if(!row.lat || !row.lng || !row.date_group) return;
-
                     var year = row.date_group;
                     var color = yearColors[year] || yearColors["default"];
-
-                    // アイコン作成
                     var customIcon = L.divIcon({
                         className: 'custom-div-icon',
                         html: `<div style="background-color:${color};" class="my-custom-pin"></div>`,
-                        iconSize: [14, 14],
-                        iconAnchor: [7, 7]
+                        iconSize: [14, 14], iconAnchor: [7, 7]
                     });
-
-                    // マーカー作成
                     var marker = L.marker([parseFloat(row.lat), parseFloat(row.lng)], {icon: customIcon})
                                   .bindPopup(`<b>${row.name}</b><br>${year}`);
-
-                    // 年別グループへの仕分け
                     if (!dateLayers[year]) {
                         dateLayers[year] = L.layerGroup().addTo(map);
                     }
                     marker.addTo(dateLayers[year]);
                 });
 
-                // 4. 右上のレイヤー切り替えメニュー作成
                 var overlays = {};
-                for (var key in dateLayers) {
-                    overlays[key] = dateLayers[key];
-                }
+                for (var key in dateLayers) { overlays[key] = dateLayers[key]; }
                 if (Object.keys(overlays).length > 0) {
                     L.control.layers(null, overlays, {collapsed: false}).addTo(map);
                 }
-
-                // 5. 左下の更新日表示を今日の日付に書き換え
-                var now = new Date();
-                var dateStr = now.getFullYear() + "/" + (now.getMonth() + 1) + "/" + now.getDate();
-                document.getElementById('last-update').innerText = "最終データ更新: " + dateStr;
-            },
-            error: function(err) {
-                document.getElementById('last-update').innerText = "CSVの読み込みに失敗しました";
-                console.error(err);
             }
         });
     </script>
