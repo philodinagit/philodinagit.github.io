@@ -2,105 +2,35 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>年別登山マップ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本アルプス登山マップ</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <style>
+        /* 全画面表示の設定 */
+        body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; }
-        
-        /* さっきの更新日表示用のスタイル */
+
+        /* 更新日表示ラベルのスタイル */
         #last-update {
             position: absolute;
-            bottom: 30px; /* 少し上に上げるとクレジットと重なりにくい */
+            bottom: 30px;
             left: 10px;
             z-index: 1000;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px 10px;
-            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 12px;
+            border-radius: 4px;
             font-size: 12px;
             font-family: sans-serif;
+            border: 1px solid #999;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             pointer-events: none;
-            border: 1px solid #ccc;
         }
 
-        /* アイコンのスタイルもここに一緒に入れてOK */
+        /* カスタムピン（ドット）のスタイル */
         .my-custom-pin {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 4px rgba(0,0,0,0.4);
-        }
-    </style>
-</head>
-<body>
-    <div id="last-update">読み込み中...</div>
-    <div id="map"></div>
-
-    <script>
-var map = L.map('map').setView([35.7, 137.8], 8);
-
-// 地理院地図（標準地図）の設定
-L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-    attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>",
-    maxZoom: 18
-}).addTo(map);
-
-        // 1. 年ごとの色設定（ここを自由に書き換えてください）
-        var yearColors = {
-            "2023年": "#FF5733", // オレンジ
-            "2024年": "#33FF57", // 緑
-            "2025年": "#3357FF", // 青
-            "default": "#999999" // その他
-        };
-
-        var dateLayers = {};
-
-        Papa.parse("mountains.csv", {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                var now = new Date();
-document.getElementById('last-update').innerText = "データ更新日: " + now.toLocaleDateString();
-                results.data.forEach(function(row) {
-                    if(!row.lat || !row.lng || !row.date_group) return;
-
-                    var year = row.date_group;
-                    var color = yearColors[year] || yearColors["default"];
-
-                    // 2. カスタムアイコンの作成
-                    var customIcon = L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div style="background-color:${color};" class="my-custom-pin"></div>`,
-                        iconSize: [12, 12],
-                        iconAnchor: [6, 6]
-                    });
-
-                    var marker = L.marker([row.lat, row.lng], {icon: customIcon})
-                                  .bindPopup(`<b>${row.name}</b><br>${year}`);
-
-                    // 年別グループへの追加
-                    if (!dateLayers[year]) {
-                        dateLayers[year] = L.layerGroup().addTo(map);
-                    }
-                    marker.addTo(dateLayers[year]);
-                });
-
-                // 3. コントロールの作成
-                var overlays = {};
-                // 年代順に並べたい場合は、ここでソート処理を入れることも可能です
-                for (var d in dateLayers) {
-                    overlays[d] = dateLayers[d];
-                }
-
-                if (Object.keys(overlays).length > 0) {
-                    L.control.layers(null, overlays, {collapsed: false}).addTo(map);
-                }
-            }
-        });
-    </script>
-</body>
-</html>
+            width: 14px;
+            height: 14px;
