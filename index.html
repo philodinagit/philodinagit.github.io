@@ -2,11 +2,12 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>日本アルプス・マップ</title>
+    <title>日本アルプスCSVマップ</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
-        #map { height: 100vh; width: 100%; } /* 画面いっぱいに表示 */
+        #map { height: 100vh; width: 100%; }
         body { margin: 0; }
     </style>
 </head>
@@ -14,54 +15,45 @@
     <div id="map"></div>
 
     <script>
-        // 1. 地図の初期化
         var map = L.map('map').setView([35.7, 137.8], 8);
-
-        // 背景地図（OpenStreetMap）
-        var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 2. ポイント群（グループ）の作成
-        
-        // 北アルプス
-        var northAlps = L.layerGroup([
-            L.marker([36.391, 137.648]).bindPopup('槍ヶ岳'),
-            L.marker([36.289, 137.648]).bindPopup('穂高岳'),
-            L.marker([36.759, 137.620]).bindPopup('剱岳')
-        ]);
-
-        // 中央アルプス
-        var centralAlps = L.layerGroup([
-            L.marker([35.789, 137.806]).bindPopup('木曽駒ヶ岳'),
-            L.marker([35.728, 137.805]).bindPopup('空木岳')
-        ]);
-
-        // 南アルプス
-        var southAlps = L.layerGroup([
-            L.marker([35.674, 138.238]).bindPopup('北岳'),
-            L.marker([35.538, 138.176]).bindPopup('赤石岳'),
-            L.marker([35.589, 138.223]).bindPopup('間ノ岳')
-        ]);
-
-        // 最初からすべて表示しておく
-        northAlps.addTo(map);
-        centralAlps.addTo(map);
-        southAlps.addTo(map);
-
-        // 3. チェックボックス（コントロール）の設定
-        var baseMaps = {
-            "標準地図": osm
+        // 各アルプスのレイヤーグループを作成
+        var groups = {
+            "north": L.layerGroup().addTo(map),
+            "central": L.layerGroup().addTo(map),
+            "south": L.layerGroup().addTo(map)
         };
 
-        var overlayMaps = {
-            "北アルプス": northAlps,
-            "中央アルプス": centralAlps,
-            "南アルプス": southAlps
-        };
+        // CSVファイルを読み込む
+        Papa.parse("mountains.csv", {
+            download: true,
+            header: true,
+            complete: function(results) {
+                // CSVの各行に対して処理
+                results.data.forEach(function(row) {
+                    if(row.lat && row.lng) {
+                        // マーカーを作成
+                        var marker = L.marker([row.lat, row.lng]).bindPopup(row.name);
+                        
+                        // group列（north, central, south）を見て、対応するグループに追加
+                        if (groups[row.group]) {
+                            marker.addTo(groups[row.group]);
+                        }
+                    }
+                });
 
-        // 地図の右上にコントロールを追加
-        L.control.layers(baseMaps, overlayMaps, {collapsed: false}).addTo(map);
+                // 読み込み終わった後にコントロールを表示
+                var overlayMaps = {
+                    "北アルプス": groups.north,
+                    "中央アルプス": groups.central,
+                    "南アルプス": groups.south
+                };
+                L.control.layers(null, overlayMaps, {collapsed: false}).addTo(map);
+            }
+        });
     </script>
 </body>
 </html>
