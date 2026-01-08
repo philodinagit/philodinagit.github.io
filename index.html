@@ -5,16 +5,31 @@
     <title>年別登山マップ</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
     <style>
         #map { height: 100vh; width: 100%; }
         body { margin: 0; }
         
-        /* カスタムアイコンのスタイル */
+        /* さっきの更新日表示用のスタイル */
+        #last-update {
+            position: absolute;
+            bottom: 30px; /* 少し上に上げるとクレジットと重なりにくい */
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: sans-serif;
+            pointer-events: none;
+            border: 1px solid #ccc;
+        }
+
+        /* アイコンのスタイルもここに一緒に入れてOK */
         .my-custom-pin {
             width: 12px;
             height: 12px;
-            border-radius: 50%; /* 丸くする */
+            border-radius: 50%;
             border: 2px solid white;
             box-shadow: 0 0 4px rgba(0,0,0,0.4);
         }
@@ -48,6 +63,8 @@ L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
+                var now = new Date();
+document.getElementById('last-update').innerText = "データ更新日: " + now.toLocaleDateString();
                 results.data.forEach(function(row) {
                     if(!row.lat || !row.lng || !row.date_group) return;
 
