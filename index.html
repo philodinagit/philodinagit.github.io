@@ -24,50 +24,54 @@
         var areaLayers = {};
         var dateLayers = {};
 
-        Papa.parse("mountains.csv", {
+Papa.parse("mountains.csv", {
             download: true,
             header: true,
+            skipEmptyLines: true, // 空行を無視する設定を追加
             complete: function(results) {
+                
                 results.data.forEach(function(row) {
-                    if(!row.lat || !row.lng) return;
+                    // 緯度・経度・グループ名が揃っていない行はスキップ
+                    if(!row.lat || !row.lng || !row.area_group || !row.date_group) return;
 
-                    // 1. マーカーを作成（共通）
-                    var marker = L.marker([row.lat, row.lng]).bindPopup(row.name + "<br>" + row.date_group);
+                    var lat = parseFloat(row.lat);
+                    var lng = parseFloat(row.lng);
+                    var marker = L.marker([lat, lng]).bindPopup(row.name);
 
-                    // 2. エリアグループの処理
-                    var area = row.area_group;
-                    if (!areaLayers[area]) areaLayers[area] = L.layerGroup();
-                    marker.addTo(areaLayers[area]);
+                    // エリアグループの作成と追加
+                    if (!areaLayers[row.area_group]) {
+                        areaLayers[row.area_group] = L.layerGroup().addTo(map);
+                    }
+                    marker.addTo(areaLayers[row.area_group]);
 
-                    // 3. 日付グループの処理（同じマーカーを別のグループにも登録）
-                    // ※注：Leafletの仕様上、同じインスタンスを同時に別グループで「表示」させると
-                    // 挙動が複雑になるため、ここでは「エリア」か「日付」どちらかで管理するのが一般的です。
-                    // 今回は「エリア別」のチェックボックスを作成します。
-                    
-                    var date = row.date_group;
-                    if (!dateLayers[date]) dateLayers[date] = L.layerGroup();
-                    // 新しくマーカーを作って日付グループに入れる
-                    L.marker([row.lat, row.lng]).bindPopup(row.name).addTo(dateLayers[date]);
+                    // 日付グループの作成と追加（別のマーカーを作成して登録）
+                    if (!dateLayers[row.date_group]) {
+                        dateLayers[row.date_group] = L.layerGroup();
+                    }
+                    L.marker([lat, lng]).bindPopup(row.name).addTo(dateLayers[row.date_group]);
                 });
 
-                // 最初はエリア別を表示
-                Object.values(areaLayers).forEach(layer => layer.addTo(map));
+                // --- 修正の要：エラー防止用のオブジェクト作成 ---
+                var overlays = {};
 
-                // コントロールに追加
-                var overlays = {
-                    "--- エリア別 ---": L.layerGroup(), // 見出し用のダミー
-                    "北アルプス": areaLayers.north,
-                    "中央アルプス": areaLayers.central,
-                    "南アルプス": areaLayers.south,
-                    "--- 年別 ---": L.layerGroup()    // 見出し用のダミー
-                };
-                
-                // 年別のデータを動的に追加
-                for (var key in dateLayers) {
-                    overlays[key] = dateLayers[key];
+                // エリアレイヤーが存在する場合のみ追加
+                for (var areaName in areaLayers) {
+                    if (areaLayers[areaName]) {
+                        overlays["エリア: " + areaName] = areaLayers[areaName];
+                    }
                 }
 
-                L.control.layers(null, overlays, {collapsed: false}).addTo(map);
+                // 日付レイヤーが存在する場合のみ追加
+                for (var dateName in dateLayers) {
+                    if (dateLayers[dateName]) {
+                        overlays["年: " + dateName] = dateLayers[dateName];
+                    }
+                }
+
+                // overlaysが空でないか確認してからコントロールを追加
+                if (Object.keys(overlays).length > 0) {
+                    L.control.layers(null, overlays, {collapsed: false}).addTo(map);
+                }
             }
         });
     </script>
