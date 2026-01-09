@@ -2,44 +2,52 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>山行ログ マップ</title>
+    <title>山行ログ マップ (地理院地図版)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         #map { height: 85vh; width: 100%; }
-        #controls { padding: 10px; background: #f9f9f9; border-bottom: 1px solid #ccc; }
+        #controls { padding: 10px; background: #f9f9f9; border-bottom: 1px solid #ccc; font-family: sans-serif; }
         .filter-group { display: inline-block; margin-right: 15px; font-size: 14px; }
-        .legend { background: white; padding: 10px; line-height: 1.5; border: 1px solid #ccc; }
-        .legend i { width: 15px; height: 15px; display: inline-block; margin-right: 5px; border-radius: 50%; }
+        .legend { background: white; padding: 10px; line-height: 1.5; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; }
+        .legend i { width: 15px; height: 15px; display: inline-block; margin-right: 5px; border-radius: 50%; vertical-align: middle; }
     </style>
 </head>
 <body>
 
 <div id="controls">
-    <strong>年月フィルタ:</strong>
+    <strong>年月表示切替:</strong>
     <div id="year-month-filters" style="display: inline-block;"></div>
 </div>
 <div id="map"></div>
 
 <script>
-    const map = L.map('map').setView([35.5, 139.2], 9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+    // 初期表示位置（日本全体が見えるくらいに設定）
+    const map = L.map('map').setView([36.0, 138.0], 7);
+
+    // 地理院地図（標準地図）のタイルレイヤーを追加
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+        attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>",
+        maxZoom: 18
     }).addTo(map);
 
     let allMarkers = [];
+    
+    // タイプ別の色設定（CSVのtype列の内容に合わせて追加・変更してください）
     const typeColors = {
-        '雪山': '#3498db',
-        '岩登り': '#e74c3c',
-        '尾根歩き': '#2ecc71',
-        'default': '#95a5a6'
+        '雪山': '#00bfff',
+        '岩登り': '#ff4500',
+        '尾根歩き': '#32cd32',
+        'ハイキング': '#ffd700',
+        'default': '#808080'
     };
 
     // CSVの読み込み
     Papa.parse("yamazutoLog.csv", {
         download: true,
         header: true,
+        skipEmptyLines: true,
         complete: function(results) {
             const data = results.data.filter(row => row.y && row.x);
             initMap(data);
@@ -51,37 +59,53 @@
         const months = new Set();
 
         data.forEach(row => {
-            const date = new Date(row.date);
-            const ym = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            // 年月の抽出 (YYYY-MM)
+            const dateStr = row.date;
+            const ym = dateStr.substring(0, 7); 
             months.add(ym);
 
-            // マーカーの色決定
-            const color = typeColors[row.type] || typeColors['default'];
+            // タイプの取得と色の決定
+            const type = row.type ? row.type.trim() : '未分類';
+            const color = typeColors[type] || typeColors['default'];
             
+            // マーカー（サークルマーカー）の作成
             const marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
                 radius: 8,
                 fillColor: color,
-                color: "#fff",
+                color: "#000",
                 weight: 1,
                 fillOpacity: 0.8
-            }).bindPopup(`<strong>${row.date}</strong><br>${row.detail}<br>タイプ: ${row.type || '不明'}`);
+            }).bindPopup(`
+                <div style="font-size:14px;">
+                    <strong>${row.date}</strong><br>
+                    ${row.detail}<br>
+                    <span style="color:gray;">タイプ: ${type}</span>
+                </div>
+            `);
 
-            marker.ym = ym; // フィルタ用にプロパティ付与
+            marker.ym = ym; 
             marker.addTo(map);
             allMarkers.push(marker);
         });
 
-        // フィルタ用チェックボックス作成
+        // 年月チェックボックスの生成（降順）
         Array.from(months).sort().reverse().forEach(ym => {
-            const span = document.createElement('span');
-            span.className = 'filter-group';
-            span.innerHTML = `<input type="checkbox" checked value="${ym}" onchange="updateFilters()"> ${ym}`;
-            filtersDiv.appendChild(span);
+            const label = document.createElement('label');
+            label.className = 'filter-group';
+            label.innerHTML = `<input type="checkbox" checked value="${ym}" onchange="updateFilters()"> ${ym}`;
+            filtersDiv.appendChild(label);
         });
 
         addLegend();
+        
+        // 全マーカーが収まるように表示範囲を調整
+        if (allMarkers.length > 0) {
+            const group = new L.featureGroup(allMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
     }
 
+    // 表示切替ロジック
     function updateFilters() {
         const checkedValues = Array.from(document.querySelectorAll('#year-month-filters input:checked'))
                                    .map(cb => cb.value);
@@ -95,11 +119,12 @@
         });
     }
 
+    // 凡例の追加
     function addLegend() {
         const legend = L.control({position: 'bottomright'});
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML += '<strong>Type</strong><br>';
+            div.innerHTML += '<strong>登山タイプ</strong><br>';
             for (let key in typeColors) {
                 if(key === 'default') continue;
                 div.innerHTML += `<i style="background: ${typeColors[key]}"></i> ${key}<br>`;
