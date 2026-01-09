@@ -2,83 +2,113 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日本アルプス登山マップ</title>
+    <title>山行ログ マップ</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100%; }
-        #last-update {
-            position: absolute; bottom: 30px; left: 10px; z-index: 1000;
-            background: rgba(255, 255, 255, 0.9); padding: 5px 12px;
-            border-radius: 4px; font-size: 12px; font-family: sans-serif;
-            border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            pointer-events: none;
-        }
-        .my-custom-pin {
-            width: 14px; height: 14px; border-radius: 50%;
-            border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);
-        }
+        #map { height: 85vh; width: 100%; }
+        #controls { padding: 10px; background: #f9f9f9; border-bottom: 1px solid #ccc; }
+        .filter-group { display: inline-block; margin-right: 15px; font-size: 14px; }
+        .legend { background: white; padding: 10px; line-height: 1.5; border: 1px solid #ccc; }
+        .legend i { width: 15px; height: 15px; display: inline-block; margin-right: 5px; border-radius: 50%; }
     </style>
 </head>
 <body>
-    <div id="last-update">更新日を確認中...</div>
-    <div id="map"></div>
 
-    <script>
-        // --- 地図の初期化 ---
-        var map = L.map('map').setView([35.7, 137.8], 8);
-        L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-            attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>"
-        }).addTo(map);
+<div id="controls">
+    <strong>年月フィルタ:</strong>
+    <div id="year-month-filters" style="display: inline-block;"></div>
+</div>
+<div id="map"></div>
 
-        // --- 1. 外部テキスト(update.txt)から更新日を読み込む ---
-        fetch('update.txt')
-            .then(response => response.text())
-            .then(text => {
-                document.getElementById('last-update').innerText = "最終データ更新: " + text;
-            })
-            .catch(err => {
-                document.getElementById('last-update').innerText = "更新日の取得に失敗しました";
-            });
+<script>
+    const map = L.map('map').setView([35.5, 139.2], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-        // --- 2. CSV読み込みと表示（前回と同じ） ---
-        var yearColors = {
-            "2023年": "#FF5733", "2024年": "#33AA57", "2025年": "#3357FF", "default": "#999999"
-        };
-        var dateLayers = {};
+    let allMarkers = [];
+    const typeColors = {
+        '雪山': '#3498db',
+        '岩登り': '#e74c3c',
+        '尾根歩き': '#2ecc71',
+        'default': '#95a5a6'
+    };
 
-        Papa.parse("mountains.csv", {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                results.data.forEach(function(row) {
-                    if(!row.lat || !row.lng || !row.date_group) return;
-                    var year = row.date_group;
-                    var color = yearColors[year] || yearColors["default"];
-                    var customIcon = L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div style="background-color:${color};" class="my-custom-pin"></div>`,
-                        iconSize: [14, 14], iconAnchor: [7, 7]
-                    });
-                    var marker = L.marker([parseFloat(row.lat), parseFloat(row.lng)], {icon: customIcon})
-                                  .bindPopup(`<b>${row.name}</b><br>${year}`);
-                    if (!dateLayers[year]) {
-                        dateLayers[year] = L.layerGroup().addTo(map);
-                    }
-                    marker.addTo(dateLayers[year]);
-                });
+    // CSVの読み込み
+    Papa.parse("yamazutoLog.csv", {
+        download: true,
+        header: true,
+        complete: function(results) {
+            const data = results.data.filter(row => row.y && row.x);
+            initMap(data);
+        }
+    });
 
-                var overlays = {};
-                for (var key in dateLayers) { overlays[key] = dateLayers[key]; }
-                if (Object.keys(overlays).length > 0) {
-                    L.control.layers(null, overlays, {collapsed: false}).addTo(map);
-                }
+    function initMap(data) {
+        const filtersDiv = document.getElementById('year-month-filters');
+        const months = new Set();
+
+        data.forEach(row => {
+            const date = new Date(row.date);
+            const ym = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            months.add(ym);
+
+            // マーカーの色決定
+            const color = typeColors[row.type] || typeColors['default'];
+            
+            const marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
+                radius: 8,
+                fillColor: color,
+                color: "#fff",
+                weight: 1,
+                fillOpacity: 0.8
+            }).bindPopup(`<strong>${row.date}</strong><br>${row.detail}<br>タイプ: ${row.type || '不明'}`);
+
+            marker.ym = ym; // フィルタ用にプロパティ付与
+            marker.addTo(map);
+            allMarkers.push(marker);
+        });
+
+        // フィルタ用チェックボックス作成
+        Array.from(months).sort().reverse().forEach(ym => {
+            const span = document.createElement('span');
+            span.className = 'filter-group';
+            span.innerHTML = `<input type="checkbox" checked value="${ym}" onchange="updateFilters()"> ${ym}`;
+            filtersDiv.appendChild(span);
+        });
+
+        addLegend();
+    }
+
+    function updateFilters() {
+        const checkedValues = Array.from(document.querySelectorAll('#year-month-filters input:checked'))
+                                   .map(cb => cb.value);
+
+        allMarkers.forEach(marker => {
+            if (checkedValues.includes(marker.ym)) {
+                map.addLayer(marker);
+            } else {
+                map.removeLayer(marker);
             }
         });
-    </script>
+    }
+
+    function addLegend() {
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function () {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML += '<strong>Type</strong><br>';
+            for (let key in typeColors) {
+                if(key === 'default') continue;
+                div.innerHTML += `<i style="background: ${typeColors[key]}"></i> ${key}<br>`;
+            }
+            return div;
+        };
+        legend.addTo(map);
+    }
+</script>
+
 </body>
 </html>
