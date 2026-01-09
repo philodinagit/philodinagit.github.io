@@ -2,48 +2,51 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>山行ログ マップ (地理院地図版)</title>
+    <title>山行ログ マップ (NEWアイコン対応)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         #map { height: 85vh; width: 100%; }
         #controls { padding: 10px; background: #f9f9f9; border-bottom: 1px solid #ccc; font-family: sans-serif; }
-        .filter-group { display: inline-block; margin-right: 15px; font-size: 14px; }
+        .filter-group { display: inline-block; margin-right: 15px; font-size: 14px; white-space: nowrap; }
         .legend { background: white; padding: 10px; line-height: 1.5; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; }
         .legend i { width: 15px; height: 15px; display: inline-block; margin-right: 5px; border-radius: 50%; vertical-align: middle; }
+        .new-icon-legend { width: 20px !important; border-radius: 0 !important; }
     </style>
 </head>
 <body>
 
 <div id="controls">
-    <strong>やまづと山行記録 / 年月表示切替:</strong>
+    <strong>年月表示切替:</strong>
     <div id="year-month-filters" style="display: inline-block;"></div>
 </div>
 <div id="map"></div>
 
 <script>
-    // 初期表示位置（日本全体が見えるくらいに設定）
     const map = L.map('map').setView([36.0, 138.0], 7);
 
-    // 地理院地図（標準地図）のタイルレイヤーを追加
     L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
         attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>",
         maxZoom: 18
     }).addTo(map);
 
     let allMarkers = [];
-    
-    // タイプ別の色設定（CSVのtype列の内容に合わせて追加・変更してください）
     const typeColors = {
         '雪山': '#00bfff',
         '岩登り': '#ff4500',
         '尾根歩き': '#32cd32',
-        '沢登り': '#ffd700',
         'default': '#808080'
     };
 
-    // CSVの読み込み
+    // NEWアイコンの定義
+    const newIcon = L.icon({
+        iconUrl: 'new.png',
+        iconSize: [32, 32],    // 画像サイズに合わせて調整してください
+        iconAnchor: [16, 32],  // アイコンの底辺中央を座標に合わせる
+        popupAnchor: [0, -32]  // ポップアップの表示位置
+    });
+
     Papa.parse("yamazutoLog.csv", {
         download: true,
         header: true,
@@ -57,29 +60,44 @@
     function initMap(data) {
         const filtersDiv = document.getElementById('year-month-filters');
         const months = new Set();
+        
+        // 現在から10日前の日付を取得
+        const now = new Date();
+        const tenDaysAgo = new Date();
+        tenDaysAgo.setDate(now.getDate() - 10);
 
         data.forEach(row => {
-            // 年月の抽出 (YYYY-MM)
             const dateStr = row.date;
+            const logDate = new Date(dateStr);
             const ym = dateStr.substring(0, 7); 
             months.add(ym);
 
-            // タイプの取得と色の決定
             const type = row.type ? row.type.trim() : '未分類';
             const color = typeColors[type] || typeColors['default'];
             
-            // マーカー（サークルマーカー）の作成
-            const marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
-                radius: 8,
-                fillColor: color,
-                color: "#000",
-                weight: 1,
-                fillOpacity: 0.8
-            }).bindPopup(`
+            let marker;
+            
+            // 直近10日以内かどうか判定
+            if (logDate >= tenDaysAgo && logDate <= now) {
+                // NEWアイコンを使用
+                marker = L.marker([parseFloat(row.y), parseFloat(row.x)], { icon: newIcon });
+            } else {
+                // 通常のサークルマーカーを使用
+                marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
+                    radius: 8,
+                    fillColor: color,
+                    color: "#000",
+                    weight: 1,
+                    fillOpacity: 0.8
+                });
+            }
+
+            marker.bindPopup(`
                 <div style="font-size:14px;">
                     <strong>${row.date}</strong><br>
                     ${row.detail}<br>
                     <span style="color:gray;">タイプ: ${type}</span>
+                    ${logDate >= tenDaysAgo ? '<br><b style="color:red;">NEW!</b>' : ''}
                 </div>
             `);
 
@@ -88,7 +106,7 @@
             allMarkers.push(marker);
         });
 
-        // 年月チェックボックスの生成（降順）
+        // フィルタ生成
         Array.from(months).sort().reverse().forEach(ym => {
             const label = document.createElement('label');
             label.className = 'filter-group';
@@ -97,15 +115,12 @@
         });
 
         addLegend();
-        
-        // 全マーカーが収まるように表示範囲を調整
         if (allMarkers.length > 0) {
             const group = new L.featureGroup(allMarkers);
             map.fitBounds(group.getBounds().pad(0.1));
         }
     }
 
-    // 表示切替ロジック
     function updateFilters() {
         const checkedValues = Array.from(document.querySelectorAll('#year-month-filters input:checked'))
                                    .map(cb => cb.value);
@@ -119,12 +134,12 @@
         });
     }
 
-    // 凡例の追加
     function addLegend() {
         const legend = L.control({position: 'bottomright'});
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<strong>登山タイプ</strong><br>';
+            div.innerHTML += `<img src="new.png" style="width:15px; vertical-align:middle;"> 直近10日<br>`;
             for (let key in typeColors) {
                 if(key === 'default') continue;
                 div.innerHTML += `<i style="background: ${typeColors[key]}"></i> ${key}<br>`;
