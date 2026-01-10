@@ -48,4 +48,137 @@
     const map = L.map('map', { tap: true }).setView([36.0, 138.0], 7);
 
     L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-        attribution: "<a href='
+        attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>",
+        maxZoom: 18
+    }).addTo(map);
+
+    let allMarkers = [];
+    const typeColors = {
+        '雪山': '#00bfff',
+        '岩登り': '#ff4500',
+        '沢登り': '#ff8c00',
+        '尾根歩き': '#32cd32',
+        'default': '#7f8c8d'
+    };
+
+    const newIcon = L.icon({
+        iconUrl: 'new.png',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -22]
+    });
+
+    Papa.parse("yamazutoLog.csv", {
+        download: true, header: true, skipEmptyLines: true,
+        complete: function(results) {
+            let data = results.data.filter(row => row.y && row.x);
+            data.sort((a, b) => new Date(a.date) - new Date(b.date));
+            document.getElementById('total-count').innerText = data.length;
+            initMap(data);
+        }
+    });
+
+    function linkify(text) {
+        const urlPattern = /(https?:\/\/[^\s]+)/g;
+        return text.replace(urlPattern, function(url) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="popup-link">詳細リンク 🔗</a>`;
+        });
+    }
+
+    function initMap(data) {
+        const filtersDiv = document.getElementById('year-month-filters');
+        const months = new Set();
+        const now = new Date();
+        const tenDaysAgo = new Date();
+        tenDaysAgo.setDate(now.getDate() - 10);
+
+        data.forEach(row => {
+            const dateStr = row.date;
+            const logDate = new Date(dateStr);
+            const ym = dateStr.substring(0, 7); 
+            months.add(ym);
+
+            const type = row.type ? row.type.trim() : '未分類';
+            const color = typeColors[type] || typeColors['default'];
+            const detailRaw = row.detail || "";
+            const detailHtml = linkify(detailRaw);
+            
+            let marker;
+            if (logDate >= tenDaysAgo && logDate <= now) {
+                marker = L.marker([parseFloat(row.y), parseFloat(row.x)], { icon: newIcon });
+            } else {
+                marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
+                    radius: 9, fillColor: color, color: "#ffffff", weight: 1.5, fillOpacity: 0.85
+                });
+            }
+
+            marker.bindPopup(`
+                <div style="font-size:15px; min-width:160px;">
+                    <b>${row.date}</b><br>
+                    <div style="margin: 4px 0;">${detailHtml}</div>
+                    <span style="font-size:11px; color:#666;">タイプ: ${type}</span>
+                </div>
+            `);
+
+            marker.ym = ym; 
+            marker.detailStr = detailRaw.toLowerCase(); 
+            
+            marker.addTo(map);
+            allMarkers.push(marker);
+        });
+
+        Array.from(months).sort().reverse().forEach(ym => {
+            const label = document.createElement('label');
+            label.className = 'filter-label';
+            label.innerHTML = `<input type="checkbox" checked value="${ym}" onchange="updateFilters()"> ${ym.replace('-', '年')}月`;
+            filtersDiv.appendChild(label);
+        });
+
+        addLegend();
+        updateFilters();
+        
+        if (allMarkers.length > 0) {
+            const group = new L.featureGroup(allMarkers);
+            map.fitBounds(group.getBounds().pad(0.2));
+        }
+    }
+
+    function updateFilters() {
+        const searchText = document.getElementById('search-input').value.toLowerCase();
+        const checkedMonths = Array.from(document.querySelectorAll('#year-month-filters input:checked'))
+                                   .map(cb => cb.value);
+
+        let visibleCount = 0;
+        allMarkers.forEach(marker => {
+            const isMonthMatch = checkedMonths.includes(marker.ym);
+            const isSearchMatch = marker.detailStr.includes(searchText);
+
+            if (isMonthMatch && isSearchMatch) {
+                map.addLayer(marker);
+                visibleCount++;
+            } else {
+                map.removeLayer(marker);
+            }
+        });
+        document.getElementById('match-count').innerText = visibleCount;
+    }
+
+    function addLegend() {
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function () {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML += '<strong>登山タイプ</strong><br>';
+            // ここで凡例のnew.pngを16pxに調整
+            div.innerHTML += `<img src="new.png" style="width:16px; height:16px; vertical-align:middle; margin-right:5px; margin-left:-2px;"> 直近10日<br>`;
+            for (let key in typeColors) {
+                if(key === 'default') continue;
+                div.innerHTML += `<i style="background: ${typeColors[key]}"></i> ${key}<br>`;
+            }
+            return div;
+        };
+        legend.addTo(map);
+    }
+</script>
+
+</body>
+</html>
