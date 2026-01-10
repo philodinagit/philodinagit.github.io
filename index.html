@@ -25,7 +25,6 @@
         .legend { background: white; padding: 8px 12px; line-height: 1.8; border-radius: 8px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.2); }
         .legend i { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 50%; vertical-align: middle; border: 1px solid #444; }
         
-        /* ポップアップ用スタイル */
         .popup-link-btn { 
             display: block; 
             text-align: center;
@@ -48,7 +47,7 @@
 
 <div id="search-container">
     <div class="search-row">
-        <input type="text" id="search-input" placeholder="場所、ルート、メンバー名で検索..." oninput="updateFilters()">
+        <input type="text" id="search-input" placeholder="場所、メンバー、タイプで検索..." oninput="updateFilters()">
         <div id="count-display"><span id="match-count">0</span> / <span id="total-count">0</span> 件</div>
     </div>
 </div>
@@ -86,9 +85,7 @@
     Papa.parse("yamazutoLog.csv", {
         download: true, header: true, skipEmptyLines: true,
         complete: function(results) {
-            // x, y が存在する有効な行のみ抽出
             let data = results.data.filter(row => row.y && row.x);
-            // 日付順にソート
             data.sort((a, b) => new Date(a.date) - new Date(b.date));
             document.getElementById('total-count').innerText = data.length;
             initMap(data);
@@ -111,13 +108,12 @@
             const type = row.type ? row.type.trim() : '未分類';
             const color = typeColors[type] || typeColors['default'];
             
-            // CSV列構成に合わせて取得
             const loc = row.location || "";
             const mem = row.member || "";
             const url = row.url ? row.url.trim() : "";
             
-            // 検索用データ作成（location + member）
-            const searchData = (loc + " " + mem).toLowerCase();
+            // 検索用データ作成（location + member + type を合体）
+            const searchData = (loc + " " + mem + " " + type).toLowerCase();
 
             let marker;
             if (logDate >= tenDaysAgo && logDate <= now) {
@@ -128,7 +124,6 @@
                 });
             }
 
-            // URLがある場合のみボタン作成
             const linkHtml = url ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">詳細リンク 🔗</a>` : "";
 
             marker.bindPopup(`
@@ -150,7 +145,6 @@
             allMarkers.push(marker);
         });
 
-        // 年月チェックボックス生成
         Array.from(months).sort().reverse().forEach(ym => {
             const label = document.createElement('label');
             label.className = 'filter-label';
@@ -159,7 +153,7 @@
         });
 
         addLegend();
-        updateFilters(); // 初期表示フィルタ適用
+        updateFilters(); 
         
         if (allMarkers.length > 0) {
             const group = new L.featureGroup(allMarkers);
@@ -168,14 +162,19 @@
     }
 
     function updateFilters() {
-        const searchText = document.getElementById('search-input').value.toLowerCase();
+        // スペース区切りでの複数単語検索に対応（AND検索）
+        const searchInput = document.getElementById('search-input').value.toLowerCase();
+        const keywords = searchInput.split(/\s+/).filter(k => k !== "");
+        
         const checkedMonths = Array.from(document.querySelectorAll('#year-month-filters input:checked'))
                                    .map(cb => cb.value);
 
         let visibleCount = 0;
         allMarkers.forEach(marker => {
             const isMonthMatch = checkedMonths.includes(marker.ym);
-            const isSearchMatch = marker.searchData.includes(searchText);
+            
+            // 全てのキーワードが含まれているかチェック
+            const isSearchMatch = keywords.every(k => marker.searchData.includes(k));
 
             if (isMonthMatch && isSearchMatch) {
                 map.addLayer(marker);
