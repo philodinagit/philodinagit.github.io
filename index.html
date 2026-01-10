@@ -24,7 +24,22 @@
 
         .legend { background: white; padding: 8px 12px; line-height: 1.8; border-radius: 8px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.2); }
         .legend i { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 50%; vertical-align: middle; border: 1px solid #444; }
-        .popup-link { display: inline-block; margin-top: 5px; color: #1a73e8; text-decoration: none; font-weight: bold; border-bottom: 1px solid #1a73e8; }
+        
+        /* 詳細リンクボタンのスタイル */
+        .popup-link-btn { 
+            display: block; 
+            text-align: center;
+            margin-top: 10px; 
+            padding: 8px;
+            background: #1a73e8;
+            color: white !important;
+            text-decoration: none; 
+            font-weight: bold; 
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .popup-member { font-size: 13px; color: #2c3e50; background: #ecf0f1; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
+        .popup-location { font-size: 14px; line-height: 1.4; color: #333; }
     </style>
 </head>
 <body>
@@ -33,7 +48,7 @@
 
 <div id="search-container">
     <div class="search-row">
-        <input type="text" id="search-input" placeholder="山名、ルート、氏名で検索..." oninput="updateFilters()">
+        <input type="text" id="search-input" placeholder="場所、ルート、氏名で検索..." oninput="updateFilters()">
         <div id="count-display"><span id="match-count">0</span> / <span id="total-count">0</span> 件</div>
     </div>
 </div>
@@ -78,13 +93,6 @@
         }
     });
 
-    function linkify(text) {
-        const urlPattern = /(https?:\/\/[^\s]+)/g;
-        return text.replace(urlPattern, function(url) {
-            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="popup-link">詳細リンク 🔗</a>`;
-        });
-    }
-
     function initMap(data) {
         const filtersDiv = document.getElementById('year-month-filters');
         const months = new Set();
@@ -100,9 +108,14 @@
 
             const type = row.type ? row.type.trim() : '未分類';
             const color = typeColors[type] || typeColors['default'];
-            const detailRaw = row.detail || "";
-            const detailHtml = linkify(detailRaw);
             
+            const locationRaw = row.location || "";
+            const memberRaw = row.member || "";
+            const urlRaw = row.url ? row.url.trim() : "";
+            
+            // 検索対象は location と member
+            const searchData = (locationRaw + " " + memberRaw).toLowerCase();
+
             let marker;
             if (logDate >= tenDaysAgo && logDate <= now) {
                 marker = L.marker([parseFloat(row.y), parseFloat(row.x)], { icon: newIcon });
@@ -112,16 +125,23 @@
                 });
             }
 
+            // URLがある場合のみリンクボタンを作成
+            const linkHtml = urlRaw ? `<a href="${urlRaw}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">詳細リンク 🔗</a>` : "";
+
             marker.bindPopup(`
                 <div style="font-size:15px; min-width:160px;">
-                    <b>${row.date}</b><br>
-                    <div style="margin: 4px 0;">${detailHtml}</div>
+                    <b style="font-size:16px;">${row.date}</b><br>
+                    <div style="margin: 8px 0;">
+                        <span class="popup-member">👤 ${memberRaw}</span><br>
+                        <div class="popup-location">${locationRaw}</div>
+                        ${linkHtml}
+                    </div>
                     <span style="font-size:11px; color:#666;">タイプ: ${type}</span>
                 </div>
             `);
 
             marker.ym = ym; 
-            marker.detailStr = detailRaw.toLowerCase(); 
+            marker.searchData = searchData; 
             
             marker.addTo(map);
             allMarkers.push(marker);
@@ -151,7 +171,7 @@
         let visibleCount = 0;
         allMarkers.forEach(marker => {
             const isMonthMatch = checkedMonths.includes(marker.ym);
-            const isSearchMatch = marker.detailStr.includes(searchText);
+            const isSearchMatch = marker.searchData.includes(searchText);
 
             if (isMonthMatch && isSearchMatch) {
                 map.addLayer(marker);
@@ -168,7 +188,6 @@
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<strong>登山タイプ</strong><br>';
-            // ここで凡例のnew.pngを16pxに調整
             div.innerHTML += `<img src="new.png" style="width:16px; height:16px; vertical-align:middle; margin-right:5px; margin-left:-2px;"> 直近10日<br>`;
             for (let key in typeColors) {
                 if(key === 'default') continue;
