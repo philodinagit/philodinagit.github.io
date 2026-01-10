@@ -69,16 +69,16 @@
 
     let allMarkers = [];
     
-    // ハイキングを削除し、色設定を整理
+    // タイプ別の色設定
     const typeColors = {
-        '雪山': '#00bfff',
-        '岩登り': '#ff4500',
-        '沢登り': '#1e90ff',
-        '尾根歩き': '#32cd32',
-        'default': '#808080'
+        '雪山': '#00bfff',     // 空色
+        '岩登り': '#ff4500',   // 朱色
+        '沢登り': '#ff8c00',   // オレンジ (DarkOrange)
+        '尾根歩き': '#32cd32', // 緑
+        'default': '#7f8c8d'   // グレー
     };
 
-    // new.png を 30px に縮小
+    // new.png のサイズを 30px に設定
     const newIcon = L.icon({
         iconUrl: 'new.png',
         iconSize: [30, 30],
@@ -114,9 +114,10 @@
             
             let marker;
             if (logDate >= tenDaysAgo && logDate <= now) {
+                // 直近10日のアイコン
                 marker = L.marker([parseFloat(row.y), parseFloat(row.x)], { icon: newIcon });
             } else {
-                // 丸マーカーの半径を 11 → 9 に縮小
+                // 通常の丸マーカー (半径 9px)
                 marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
                     radius: 9, 
                     fillColor: color,
@@ -140,6 +141,7 @@
             allMarkers.push(marker);
         });
 
+        // フィルタボタンの生成
         Array.from(months).sort().reverse().forEach(ym => {
             const label = document.createElement('label');
             label.className = 'filter-label';
