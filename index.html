@@ -2,52 +2,98 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>山行ログ マップ (NEWアイコン対応)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>やまづと山行記録</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        #map { height: 85vh; width: 100%; }
-        #controls { padding: 10px; background: #f9f9f9; border-bottom: 1px solid #ccc; font-family: sans-serif; }
-        .filter-group { display: inline-block; margin-right: 15px; font-size: 14px; white-space: nowrap; }
-        .legend { background: white; padding: 10px; line-height: 1.5; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; }
-        .legend i { width: 15px; height: 15px; display: inline-block; margin-right: 5px; border-radius: 50%; vertical-align: middle; }
-        .new-icon-legend { width: 20px !important; border-radius: 0 !important; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f4; }
+        
+        /* ヘッダータイトル */
+        header { background: #2c3e50; color: white; padding: 10px 15px; text-align: center; font-weight: bold; font-size: 18px; }
+
+        /* フィルタ部分のスマホ最適化 */
+        #controls { 
+            height: 55px; 
+            background: #fff; 
+            border-bottom: 1px solid #ddd; 
+            display: flex; 
+            align-items: center; 
+            overflow-x: auto; 
+            white-space: nowrap;
+            padding: 0 10px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .filter-label {
+            display: inline-flex;
+            align-items: center;
+            background: #e8f0fe;
+            padding: 6px 14px;
+            margin-right: 8px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid #adc6ff;
+            color: #1a73e8;
+            font-weight: 500;
+        }
+        .filter-label input { margin-right: 5px; transform: scale(1.2); }
+
+        #map { height: calc(100vh - 100px); width: 100%; }
+
+        /* 凡例 */
+        .legend { 
+            background: white; 
+            padding: 10px; 
+            line-height: 1.8; 
+            border: 1px solid #ccc; 
+            border-radius: 8px; 
+            font-size: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .legend i { width: 14px; height: 14px; display: inline-block; margin-right: 6px; border-radius: 50%; vertical-align: middle; border: 1px solid #666; }
     </style>
 </head>
 <body>
 
+<header>やまづと山行記録</header>
+
 <div id="controls">
-    <strong>年月表示切替:</strong>
-    <div id="year-month-filters" style="display: inline-block;"></div>
+    <div id="year-month-filters"></div>
 </div>
 <div id="map"></div>
 
 <script>
-    const map = L.map('map').setView([36.0, 138.0], 7);
+    // 日本全体が見える位置に初期設定
+    const map = L.map('map', { tap: true }).setView([36.0, 138.0], 7);
 
+    // 地理院地図
     L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
         attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院地図</a>",
         maxZoom: 18
     }).addTo(map);
 
     let allMarkers = [];
+    
+    // タイプ別の色設定（沢登りを追加）
     const typeColors = {
-        '雪山': '#00bfff',
-        '岩登り': '#ff4500',
-        '尾根歩き': '#32cd32',
-        '沢登り': '#FFCC33',
-        'default': '#808080'
+        '雪山': '#00bfff',     // DeepSkyBlue
+        '岩登り': '#ff4500',   // OrangeRed
+        '沢登り': '#1e90ff',   // DodgerBlue
+        '尾根歩き': '#32cd32', // LimeGreen
+        'ハイキング': '#ffa500', // Orange
+        'default': '#808080'   // Gray
     };
 
-    // NEWアイコンの定義
     const newIcon = L.icon({
         iconUrl: 'new.png',
-        iconSize: [32, 32],    // 画像サイズに合わせて調整してください
-        iconAnchor: [16, 32],  // アイコンの底辺中央を座標に合わせる
-        popupAnchor: [0, -32]  // ポップアップの表示位置
+        iconSize: [40, 40],
+        iconAnchor: [20, 40],
+        popupAnchor: [0, -35]
     });
 
+    // CSV読み込み
     Papa.parse("yamazutoLog.csv", {
         download: true,
         header: true,
@@ -61,8 +107,6 @@
     function initMap(data) {
         const filtersDiv = document.getElementById('year-month-filters');
         const months = new Set();
-        
-        // 現在から10日前の日付を取得
         const now = new Date();
         const tenDaysAgo = new Date();
         tenDaysAgo.setDate(now.getDate() - 10);
@@ -77,30 +121,29 @@
             const color = typeColors[type] || typeColors['default'];
             
             let marker;
-            
-            // 直近10日以内かどうか判定
+            // 直近10日の判定
             if (logDate >= tenDaysAgo && logDate <= now) {
-                // NEWアイコンを使用
                 marker = L.marker([parseFloat(row.y), parseFloat(row.x)], { icon: newIcon });
             } else {
-                // 通常のサークルマーカーを使用
                 marker = L.circleMarker([parseFloat(row.y), parseFloat(row.x)], {
-                    radius: 8,
+                    radius: 11, // スマホでタップしやすいサイズ
                     fillColor: color,
-                    color: "#000",
-                    weight: 1,
-                    fillOpacity: 0.8
+                    color: "#ffffff",
+                    weight: 2,
+                    fillOpacity: 0.9
                 });
             }
 
             marker.bindPopup(`
-                <div style="font-size:14px;">
-                    <strong>${row.date}</strong><br>
-                    ${row.detail}<br>
-                    <span style="color:gray;">タイプ: ${type}</span>
-                    ${logDate >= tenDaysAgo ? '<br><b style="color:red;">NEW!</b>' : ''}
+                <div style="font-size:16px; min-width:160px; line-height:1.4;">
+                    <b style="font-size:18px;">${row.date}</b><br>
+                    <div style="margin: 5px 0;">${row.detail}</div>
+                    <span style="display:inline-block; padding:2px 8px; border-radius:10px; background:#eee; font-size:12px; color:#333;">
+                        タイプ: ${type}
+                    </span>
+                    ${logDate >= tenDaysAgo ? '<br><span style="color:red; font-weight:bold;">★最近の記録!</span>' : ''}
                 </div>
-            `);
+            `, { autoPanPadding: L.point(50, 50) });
 
             marker.ym = ym; 
             marker.addTo(map);
@@ -110,15 +153,15 @@
         // フィルタ生成
         Array.from(months).sort().reverse().forEach(ym => {
             const label = document.createElement('label');
-            label.className = 'filter-group';
-            label.innerHTML = `<input type="checkbox" checked value="${ym}" onchange="updateFilters()"> ${ym}`;
+            label.className = 'filter-label';
+            label.innerHTML = `<input type="checkbox" checked value="${ym}" onchange="updateFilters()"> ${ym.replace('-', '年')}月`;
             filtersDiv.appendChild(label);
         });
 
         addLegend();
         if (allMarkers.length > 0) {
             const group = new L.featureGroup(allMarkers);
-            map.fitBounds(group.getBounds().pad(0.1));
+            map.fitBounds(group.getBounds().pad(0.2));
         }
     }
 
@@ -140,7 +183,7 @@
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<strong>登山タイプ</strong><br>';
-            div.innerHTML += `<img src="new.png" style="width:15px; vertical-align:middle;"> 直近10日<br>`;
+            div.innerHTML += `<img src="new.png" style="width:16px; vertical-align:middle; margin-right:5px;"> 直近10日<br>`;
             for (let key in typeColors) {
                 if(key === 'default') continue;
                 div.innerHTML += `<i style="background: ${typeColors[key]}"></i> ${key}<br>`;
