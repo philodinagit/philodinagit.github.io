@@ -67,9 +67,9 @@
     }).addTo(map);
 
     let allMarkers = [];
+    // 岩登りを削除
     const typeColors = {
         '雪山': '#00bfff',
-        '岩登り': '#ff4500',
         '沢登り': '#ff8c00',
         '尾根歩き': '#32cd32',
         'default': '#7f8c8d'
@@ -112,7 +112,6 @@
             const mem = row.member || "";
             const url = row.url ? row.url.trim() : "";
             
-            // 検索用データ作成（location + member + type を合体）
             const searchData = (loc + " " + mem + " " + type).toLowerCase();
 
             let marker;
@@ -162,7 +161,6 @@
     }
 
     function updateFilters() {
-        // スペース区切りでの複数単語検索に対応（AND検索）
         const searchInput = document.getElementById('search-input').value.toLowerCase();
         const keywords = searchInput.split(/\s+/).filter(k => k !== "");
         
@@ -172,8 +170,6 @@
         let visibleCount = 0;
         allMarkers.forEach(marker => {
             const isMonthMatch = checkedMonths.includes(marker.ym);
-            
-            // 全てのキーワードが含まれているかチェック
             const isSearchMatch = keywords.every(k => marker.searchData.includes(k));
 
             if (isMonthMatch && isSearchMatch) {
