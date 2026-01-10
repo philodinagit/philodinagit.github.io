@@ -11,63 +11,20 @@
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f8f9fa; }
         header { background: #34495e; color: white; padding: 12px 15px; text-align: center; font-weight: bold; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-        /* 検索と件数表示のレイアウト */
-        #search-container { 
-            background: #fff; 
-            padding: 10px; 
-            border-bottom: 1px solid #eee; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 8px;
-        }
+        #search-container { background: #fff; padding: 10px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 8px; }
         .search-row { display: flex; gap: 8px; align-items: center; }
-        #search-input { 
-            flex-grow: 1; 
-            padding: 10px; 
-            border: 1px solid #ccc; 
-            border-radius: 8px; 
-            font-size: 16px; 
-            box-sizing: border-box;
-        }
-        #count-display { 
-            font-size: 13px; 
-            color: #666; 
-            background: #f0f0f0; 
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            white-space: nowrap;
-            font-weight: bold;
-        }
+        #search-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        #count-display { font-size: 13px; color: #666; background: #f0f0f0; padding: 8px 12px; border-radius: 8px; white-space: nowrap; font-weight: bold; }
 
-        #controls { 
-            height: 45px; 
-            background: #fff; 
-            border-bottom: 1px solid #dee2e6; 
-            display: flex; 
-            align-items: center; 
-            overflow-x: auto; 
-            white-space: nowrap;
-            padding: 0 10px;
-            -webkit-overflow-scrolling: touch;
-        }
-        .filter-label {
-            display: inline-flex;
-            align-items: center;
-            background: #e9ecef;
-            padding: 6px 14px;
-            margin-right: 8px;
-            border-radius: 20px;
-            font-size: 13px;
-            cursor: pointer;
-            border: 1px solid #ced4da;
-            color: #495057;
-        }
+        #controls { height: 45px; background: #fff; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; overflow-x: auto; white-space: nowrap; padding: 0 10px; -webkit-overflow-scrolling: touch; }
+        .filter-label { display: inline-flex; align-items: center; background: #e9ecef; padding: 6px 14px; margin-right: 8px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1px solid #ced4da; color: #495057; }
         .filter-label input { margin-right: 5px; }
 
         #map { height: calc(100vh - 175px); width: 100%; }
 
         .legend { background: white; padding: 8px 12px; line-height: 1.8; border-radius: 8px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.2); }
         .legend i { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 50%; vertical-align: middle; border: 1px solid #444; }
+        .popup-link { display: inline-block; margin-top: 5px; color: #1a73e8; text-decoration: none; font-weight: bold; border-bottom: 1px solid #1a73e8; }
     </style>
 </head>
 <body>
@@ -104,21 +61,31 @@
         'default': '#7f8c8d'
     };
 
+    // new.png を 24px にさらに縮小
     const newIcon = L.icon({
         iconUrl: 'new.png',
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-        popupAnchor: [0, -28]
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -22]
     });
 
     Papa.parse("yamazutoLog.csv", {
         download: true, header: true, skipEmptyLines: true,
         complete: function(results) {
-            const data = results.data.filter(row => row.y && row.x);
+            let data = results.data.filter(row => row.y && row.x);
+            // 日付の古い順にソート（新しいものが手前にくるように）
+            data.sort((a, b) => new Date(a.date) - new Date(b.date));
             document.getElementById('total-count').innerText = data.length;
             initMap(data);
         }
     });
+
+    function linkify(text) {
+        const urlPattern = /(https?:\/\/[^\s]+)/g;
+        return text.replace(urlPattern, function(url) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="popup-link">詳細リンク 🔗</a>`;
+        });
+    }
 
     function initMap(data) {
         const filtersDiv = document.getElementById('year-month-filters');
@@ -135,7 +102,8 @@
 
             const type = row.type ? row.type.trim() : '未分類';
             const color = typeColors[type] || typeColors['default'];
-            const detailText = row.detail || "";
+            const detailRaw = row.detail || "";
+            const detailHtml = linkify(detailRaw);
             
             let marker;
             if (logDate >= tenDaysAgo && logDate <= now) {
@@ -149,13 +117,13 @@
             marker.bindPopup(`
                 <div style="font-size:15px; min-width:160px;">
                     <b>${row.date}</b><br>
-                    <div style="margin: 4px 0;">${detailText}</div>
+                    <div style="margin: 4px 0;">${detailHtml}</div>
                     <span style="font-size:11px; color:#666;">タイプ: ${type}</span>
                 </div>
             `);
 
             marker.ym = ym; 
-            marker.detailStr = detailText.toLowerCase(); 
+            marker.detailStr = detailRaw.toLowerCase(); 
             
             marker.addTo(map);
             allMarkers.push(marker);
@@ -169,7 +137,7 @@
         });
 
         addLegend();
-        updateFilters(); // 初期カウント表示
+        updateFilters();
         
         if (allMarkers.length > 0) {
             const group = new L.featureGroup(allMarkers);
@@ -183,7 +151,6 @@
                                    .map(cb => cb.value);
 
         let visibleCount = 0;
-
         allMarkers.forEach(marker => {
             const isMonthMatch = checkedMonths.includes(marker.ym);
             const isSearchMatch = marker.detailStr.includes(searchText);
@@ -195,8 +162,6 @@
                 map.removeLayer(marker);
             }
         });
-
-        // 件数表示の更新
         document.getElementById('match-count').innerText = visibleCount;
     }
 
@@ -205,7 +170,7 @@
         legend.onAdd = function () {
             const div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<strong>登山タイプ</strong><br>';
-            div.innerHTML += `<img src="new.png" style="width:14px; vertical-align:middle; margin-right:5px;"> 直近10日<br>`;
+            div.innerHTML += `<img src="new.png" style="width:12px; vertical-align:middle; margin-right:5px;"> 直近10日<br>`;
             for (let key in typeColors) {
                 if(key === 'default') continue;
                 div.innerHTML += `<i style="background: ${typeColors[key]}"></i> ${key}<br>`;
