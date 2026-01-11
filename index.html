@@ -39,6 +39,25 @@
         }
         .popup-member { font-size: 13px; color: #2c3e50; background: #ecf0f1; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
         .popup-location { font-size: 14px; line-height: 1.4; color: #333; font-weight: 500; }
+
+        /* 左下の「やまづと」リンク */
+        .footer-link {
+            position: fixed;
+            left: 10px;
+            bottom: 10px;
+            z-index: 1000;
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .footer-link a {
+            color: #7f8c8d;
+            text-decoration: none;
+        }
+        .footer-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -58,6 +77,10 @@
 
 <div id="map"></div>
 
+<div class="footer-link">
+    <a href="https://yamazuto2.com/" target="_blank">やまづと</a>
+</div>
+
 <script>
     const map = L.map('map', { tap: true }).setView([36.0, 138.0], 7);
 
@@ -67,7 +90,6 @@
     }).addTo(map);
 
     let allMarkers = [];
-    // 岩登りを削除
     const typeColors = {
         '雪山': '#00bfff',
         '沢登り': '#ff8c00',
@@ -112,6 +134,7 @@
             const mem = row.member || "";
             const url = row.url ? row.url.trim() : "";
             
+            // 検索対象: location + member + type
             const searchData = (loc + " " + mem + " " + type).toLowerCase();
 
             let marker;
